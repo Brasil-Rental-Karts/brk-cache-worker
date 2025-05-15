@@ -7,8 +7,13 @@ import { connectRedis } from './services/redis';
 import { processMessage } from './services/messageProcessor';
 import { CacheMessage } from './types';
 
+import { startHealthCheckServer, startPeriodicHealthCheck } from './services/healthCheck';
+
 async function startWorker(): Promise<void> {
   try {
+    // Start health check server and periodic checks
+    startHealthCheckServer();
+    startPeriodicHealthCheck();
     // Connect to Redis
     const redisClient = await connectRedis();
     logger.info('Connected to Redis');
