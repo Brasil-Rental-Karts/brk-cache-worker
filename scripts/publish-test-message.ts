@@ -3,18 +3,21 @@
  * 
  * Usage: 
  * 1. Make sure RabbitMQ is running
- * 2. Run: node scripts/publish-test-message.js
+ * 2. Run: npx ts-node scripts/publish-test-message.ts
  */
 
-require('dotenv').config();
-const amqp = require('amqplib');
+import dotenv from 'dotenv';
+dotenv.config();
 
-async function publishTestMessage() {
+import amqp from 'amqplib';
+import { CacheMessage } from '../src/types';
+
+async function publishTestMessage(): Promise<void> {
   let connection;
   try {
     // Sample message that matches the expected format
-    const testMessage = {
-      operation: 'INSERT', // Can be INSERT, UPDATE, or DELETE
+    const testMessage: CacheMessage = {
+      operation: 'INSERT',
       table: 'Clubs',
       timestamp: Date.now() / 1000, // Current timestamp in seconds
       data: {
@@ -56,7 +59,8 @@ async function publishTestMessage() {
     // Close the connection
     await channel.close();
   } catch (error) {
-    console.error(`Error publishing test message: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error publishing test message: ${errorMessage}`);
   } finally {
     if (connection) {
       await connection.close();

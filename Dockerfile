@@ -4,10 +4,16 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy application code
 COPY . .
+
+# Build TypeScript code
+RUN npm run build
+
+# Prune dev dependencies after build
+RUN npm prune --production
 
 # Create logs directory
 RUN mkdir -p logs
@@ -17,4 +23,4 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 RUN chown -R appuser:appgroup /app
 USER appuser
 
-CMD ["node", "src/index.js"]
+CMD ["node", "dist/index.js"]

@@ -1,16 +1,25 @@
-const { logger } = require('../utils/logger');
-const { sendToDLQ } = require('./rabbitmq');
+import { Redis } from 'ioredis';
+import { Channel } from 'amqplib';
+import { logger } from '../utils/logger';
+import { sendToDLQ } from './rabbitmq';
+import { CacheMessage, RedisData } from '../types';
 
 /**
  * Process a message from RabbitMQ and update Redis accordingly
- * @param {Object} message - The message object from RabbitMQ
- * @param {Object} redisClient - The Redis client instance
- * @param {Object} rabbitMQChannel - The RabbitMQ channel
- * @param {string} dlqExchange - The DLQ exchange name
- * @param {string} dlqRoutingKey - The DLQ routing key
- * @returns {Promise<void>}
+ * @param message - The message object from RabbitMQ
+ * @param redisClient - The Redis client instance
+ * @param rabbitMQChannel - The RabbitMQ channel
+ * @param dlqExchange - The DLQ exchange name
+ * @param dlqRoutingKey - The DLQ routing key
+ * @returns Promise<void>
  */
-async function processMessage(message, redisClient, rabbitMQChannel, dlqExchange, dlqRoutingKey) {
+export async function processMessage(
+  message: CacheMessage, 
+  redisClient: Redis, 
+  rabbitMQChannel?: Channel, 
+  dlqExchange?: string, 
+  dlqRoutingKey?: string
+): Promise<void> {
   try {
     const { operation, table, timestamp, data } = message;
     
@@ -34,7 +43,7 @@ async function processMessage(message, redisClient, rabbitMQChannel, dlqExchange
     // Check if there's an existing record with timestamp to handle out-of-order messages
     const existingData = await redisClient.get(redisKey);
     if (existingData) {
-      const existingRecord = JSON.parse(existingData);
+      const existingRecord = JSON.parse(existingData) as RedisData;
       // If we have a record with a more recent timestamp, skip this update
       if (existingRecord._timestamp && existingRecord._timestamp > timestamp) {
         logger.warn(`Skipping outdated message with timestamp ${timestamp} for ${redisKey}`);
@@ -43,7 +52,7 @@ async function processMessage(message, redisClient, rabbitMQChannel, dlqExchange
     }
     
     // Add timestamp to data for future reference
-    const dataToStore = { ...data, _timestamp: timestamp };
+    const dataToStore: RedisData = { ...data, _timestamp: timestamp };
     
     switch (operation.toUpperCase()) {
       case 'INSERT':
@@ -69,9 +78,8 @@ async function processMessage(message, redisClient, rabbitMQChannel, dlqExchange
         throw new Error(reason);
     }
   } catch (error) {
-    logger.error(`Error processing message: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`Error processing message: ${errorMessage}`);
     throw error;
   }
 }
-
-module.exports = { processMessage };

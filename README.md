@@ -1,6 +1,6 @@
 # BRK Cache Worker
 
-A Node.js worker service that consumes messages from RabbitMQ and updates a Redis cache based on the operation type (INSERT, UPDATE, DELETE).
+A worker service that consumes messages from RabbitMQ and updates Redis cache accordingly. Built with TypeScript and Node.js.
 
 ## Overview
 
@@ -40,9 +40,43 @@ For example: `clubs:dae88056-e830-461a-b299-000aac64b4ce`
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js (v18 or higher)
+- TypeScript
 - RabbitMQ server
 - Redis server
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+
+# Build TypeScript code
+npm run build
+```
+
+### Development
+
+```bash
+# Run in development mode with auto-reload
+npm run dev
+
+# Build TypeScript files
+npm run build
+
+# Run in production mode
+npm start
+```
+
+### Testing
+
+```bash
+# Run tests
+npm test
+
+# Publish a test message to RabbitMQ
+npx ts-node scripts/publish-test-message.ts
+```
 
 ### Installation
 

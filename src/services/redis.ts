@@ -1,14 +1,14 @@
-const Redis = require('ioredis');
-const { logger } = require('../utils/logger');
+import Redis from 'ioredis';
+import { logger } from '../utils/logger';
 
-async function connectRedis() {
+export async function connectRedis(): Promise<Redis> {
   try {
     const redisClient = new Redis({
       host: process.env.REDIS_HOST,
-      port: process.env.REDIS_PORT,
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
       password: process.env.REDIS_PASSWORD || undefined,
-      db: process.env.REDIS_DB || 0,
-      retryStrategy: (times) => {
+      db: parseInt(process.env.REDIS_DB || '0', 10),
+      retryStrategy: (times: number) => {
         const delay = Math.min(times * 50, 2000);
         logger.info(`Redis connection retry in ${delay}ms`);
         return delay;
@@ -21,9 +21,8 @@ async function connectRedis() {
     
     return redisClient;
   } catch (error) {
-    logger.error(`Redis connection error: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`Redis connection error: ${errorMessage}`);
     throw error;
   }
 }
-
-module.exports = { connectRedis };
