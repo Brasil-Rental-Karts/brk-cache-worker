@@ -21,14 +21,32 @@ export async function connectRabbitMQ(): Promise<RabbitMQConnection> {
     await channel.assertExchange(exchange, 'topic', { durable: true });
 
     // Ensure queue exists
-    await channel.assertQueue(queue, { durable: true });
+    // Use passive:true to check if queue exists without trying to modify it
+    try {
+      await channel.checkQueue(queue);
+      logger.info(`Queue ${queue} already exists, using existing configuration`);
+    } catch (error) {
+      // Queue doesn't exist, create it
+      await channel.assertQueue(queue, { durable: true });
+    }
 
     // Bind queue to exchange with routing key
+    // We don't need to check if binding exists as bindQueue is idempotent
     await channel.bindQueue(queue, exchange, routingKey);
 
     // Set up DLQ exchange and queue
     await channel.assertExchange(dlqExchange, 'topic', { durable: true });
-    await channel.assertQueue(dlqQueue, { durable: true });
+    
+    // Check if DLQ queue exists
+    try {
+      await channel.checkQueue(dlqQueue);
+      logger.info(`DLQ Queue ${dlqQueue} already exists, using existing configuration`);
+    } catch (error) {
+      // DLQ Queue doesn't exist, create it
+      await channel.assertQueue(dlqQueue, { durable: true });
+    }
+    
+    // Bind DLQ queue to exchange with routing key
     await channel.bindQueue(dlqQueue, dlqExchange, dlqRoutingKey);
 
     // Set prefetch to process one message at a time
