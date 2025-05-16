@@ -30,9 +30,3 @@ export async function checkHealth(): Promise<void> {
     logger.error(`Health check error: ${errorMessage}`);
   }
 }
-
-// Start periodic health checks
-export function startPeriodicHealthCheck(): void {
-  // Check health every 5 minutes
-  setInterval(checkHealth, 5 * 60 * 1000);
-}
