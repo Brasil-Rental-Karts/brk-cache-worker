@@ -34,5 +34,5 @@ export async function checkHealth(): Promise<void> {
 // Start periodic health checks
 export function startPeriodicHealthCheck(): void {
   // Check health every 5 minutes
-  setInterval(checkHealth, 1 * 60 * 1000);
+  setInterval(checkHealth, 5 * 60 * 1000);
 }
