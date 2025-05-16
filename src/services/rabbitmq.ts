@@ -13,41 +13,90 @@ export async function connectRabbitMQ(): Promise<RabbitMQConnection> {
     const dlqExchange = process.env.RABBITMQ_DLQ_EXCHANGE || `${exchange}_dlq`;
     const dlqRoutingKey = process.env.RABBITMQ_DLQ_ROUTING_KEY || `${routingKey}.dlq`;
 
+    if (!url || !queue || !exchange || !routingKey) {
+      throw new Error(`Missing required RabbitMQ configuration: 
+        URL: ${url ? 'OK' : 'MISSING'}, 
+        Queue: ${queue ? 'OK' : 'MISSING'}, 
+        Exchange: ${exchange ? 'OK' : 'MISSING'}, 
+        Routing Key: ${routingKey ? 'OK' : 'MISSING'}`);
+    }
+
     // Connect to RabbitMQ
+    logger.info(`Connecting to RabbitMQ at ${url}`);
     const connection = await amqp.connect(url) as unknown as ChannelModel;
-    const channel = await connection.createChannel();
+    let channel = await connection.createChannel();
 
     // Ensure exchange exists
     await channel.assertExchange(exchange, 'topic', { durable: true });
+    logger.info(`Ensured exchange ${exchange} exists`);
 
-    // Ensure queue exists
-    // Use passive:true to check if queue exists without trying to modify it
+    // Handle queue creation - don't use checkQueue as it closes the channel on 404
     try {
-      await channel.checkQueue(queue);
-      logger.info(`Queue ${queue} already exists, using existing configuration`);
+      // Create the queue with noAssert option to assert without error if queue exists
+      await channel.assertQueue(queue, { 
+        durable: true,
+        // Don't specify DLX settings here - let the server or admin manage them
+      });
+      logger.info(`Queue ${queue} asserted successfully`);
     } catch (error) {
-      // Queue doesn't exist, create it
-      await channel.assertQueue(queue, { durable: true });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error asserting queue ${queue}: ${errorMessage}`);
+      
+      // If channel was closed, create a new one
+      if (errorMessage.includes('Channel closed')) {
+        logger.info('Channel was closed, creating a new one');
+        channel = await connection.createChannel();
+      }
     }
 
-    // Bind queue to exchange with routing key
-    // We don't need to check if binding exists as bindQueue is idempotent
-    await channel.bindQueue(queue, exchange, routingKey);
+    // Bind queue to exchange with routing key (idempotent)
+    try {
+      await channel.bindQueue(queue, exchange, routingKey);
+      logger.info(`Bound queue ${queue} to exchange ${exchange} with routing key ${routingKey}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error binding queue ${queue}: ${errorMessage}`);
+      
+      // If channel was closed, create a new one
+      if (errorMessage.includes('Channel closed')) {
+        logger.info('Channel was closed, creating a new one');
+        channel = await connection.createChannel();
+      }
+    }
 
-    // Set up DLQ exchange and queue
+    // Set up DLQ exchange
     await channel.assertExchange(dlqExchange, 'topic', { durable: true });
+    logger.info(`Ensured DLQ exchange ${dlqExchange} exists`);
     
-    // Check if DLQ queue exists
+    // Check if DLQ queue exists - handle channel closure
     try {
-      await channel.checkQueue(dlqQueue);
-      logger.info(`DLQ Queue ${dlqQueue} already exists, using existing configuration`);
-    } catch (error) {
-      // DLQ Queue doesn't exist, create it
       await channel.assertQueue(dlqQueue, { durable: true });
+      logger.info(`DLQ Queue ${dlqQueue} asserted successfully`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error asserting DLQ queue ${dlqQueue}: ${errorMessage}`);
+      
+      // If channel was closed, create a new one
+      if (errorMessage.includes('Channel closed')) {
+        logger.info('Channel was closed, creating a new one');
+        channel = await connection.createChannel();
+      }
     }
     
-    // Bind DLQ queue to exchange with routing key
-    await channel.bindQueue(dlqQueue, dlqExchange, dlqRoutingKey);
+    // Bind DLQ queue to exchange with routing key (idempotent)
+    try {
+      await channel.bindQueue(dlqQueue, dlqExchange, dlqRoutingKey);
+      logger.info(`Bound DLQ queue ${dlqQueue} to exchange ${dlqExchange} with routing key ${dlqRoutingKey}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Error binding DLQ queue ${dlqQueue}: ${errorMessage}`);
+      
+      // If channel was closed, create a new one
+      if (errorMessage.includes('Channel closed')) {
+        logger.info('Channel was closed, creating a new one');
+        channel = await connection.createChannel();
+      }
+    }
 
     // Set prefetch to process one message at a time
     await channel.prefetch(1);

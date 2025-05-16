@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 
 const app = express();
 const PORT = process.env.HEALTH_CHECK_PORT || 3000;
+const WORKER_URL = process.env.WORKER_URL || 'http://localhost';
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -18,7 +19,7 @@ export function startHealthCheckServer(): void {
 // Function to make self-request to health endpoint
 export async function checkHealth(): Promise<void> {
   try {
-    const response = await fetch(`http://localhost:${PORT}/health`);
+    const response = await fetch(`${WORKER_URL}:${PORT}/health`);
     if (!response.ok) {
       logger.warn('Health check failed');
     } else {
@@ -32,6 +33,6 @@ export async function checkHealth(): Promise<void> {
 
 // Start periodic health checks
 export function startPeriodicHealthCheck(): void {
-  // Check health every 10 minutes
-  setInterval(checkHealth, 10 * 60 * 1000);
+  // Check health every 5 minutes
+  setInterval(checkHealth, 1 * 60 * 1000);
 }
